@@ -7,6 +7,7 @@
 #include "cmsis_os2.h"
 #include "MKL25Z4.h"
 
+#define BAUD_RATE 9600
 #define MASK(x) (1UL << (x))
 #define LED_RED (18)
 #define LED_GREEN (19)
@@ -23,6 +24,10 @@
 // Audio Pins
 #define PTE29_Pin 29
 #define MUSIC_MOD(x) (163840/x)
+// UART Pins
+#define UART_TX_PORTE22 22
+#define UART_RX_PORTE23 23
+#define UART2_INT_PRIO 128
 
 
 /* Delay routine */
@@ -303,6 +308,52 @@ void initAudio(void) {
 	TPM0_C2SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
 	
 	audio_end = 0;
+}
+
+/**** UART ****/
+static volatile uint8_t uart_data;
+
+/* Init UART2 Interrupt */
+void initUART2Interrupt(uint32_t baud_rate) {
+	uint32_t divisor, bus_clock;
+	
+	SIM->SCGC4 |= SIM_SCGC4_UART2_MASK;
+	SIM->SCGC5 |= SIM_SCGC5_PORTE_MASK;
+	
+	PORTE->PCR[UART_TX_PORTE22] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[UART_TX_PORTE22] |= PORT_PCR_MUX(4);
+	
+	PORTE->PCR[UART_RX_PORTE23] &= ~PORT_PCR_MUX_MASK;
+	PORTE->PCR[UART_RX_PORTE23] |= PORT_PCR_MUX(4);
+	
+	UART2->C2 &= ~((UART_C2_TE_MASK) | (UART_C2_RE_MASK) | (UART_C2_TIE_MASK) | (UART_C2_RIE_MASK));
+	
+	bus_clock = (DEFAULT_SYSTEM_CLOCK)/2;
+	divisor = bus_clock / (baud_rate * 16);
+	UART2->BDH = UART_BDH_SBR(divisor >> 8);
+	UART2->BDL = UART_BDL_SBR(divisor);
+	
+	UART2->C1 = 0;
+	UART2->S2 = 0;
+	UART2->C3 = 0;
+	
+	NVIC_SetPriority(UART2_IRQn, 128);
+	NVIC_ClearPendingIRQ(UART2_IRQn);
+	NVIC_EnableIRQ(UART2_IRQn);
+	UART2->C2 |= ((UART_C2_TE_MASK) | (UART_C2_RE_MASK) | (UART_C2_TIE_MASK) | (UART_C2_RIE_MASK));
+	uart_data = 0;
+}
+
+/* UART2 Interrupt Handler */
+void UART2_IRQHandler(void) {
+	NVIC_ClearPendingIRQ(UART2_IRQn);
+	if (UART2->S1 & UART_S1_TDRE_MASK) {
+		// do something to transmit data, UART2->D = ...
+		UART2->C2 &= ~UART_C2_TIE_MASK; //in this case not transmitting data, so disable interrupt
+	}
+	if (UART2->S1 & UART_S1_RDRF_MASK) {
+		uart_data = UART2->D;
+	}
 }
 
 int main (void) {
