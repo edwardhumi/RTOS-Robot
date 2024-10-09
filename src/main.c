@@ -6,6 +6,7 @@
 #include  CMSIS_device_header
 #include "cmsis_os2.h"
 #include "MKL25Z4.h"
+#include "audio.h"
 
 #define BAUD_RATE 9600
 #define MASK(x) (1UL << (x))
@@ -76,6 +77,28 @@ void led_control(enum color_t color, uint8_t on) {
 	}
 }
 
+void initGPIO() {
+	//enable clock
+	SIM->SCGC5 |= (SIM_SCGC5_PORTB_MASK | SIM_SCGC5_PORTD_MASK);
+	
+	//set MUX to GPIO
+	PORTB->PCR[LED_RED] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[LED_RED] |= PORT_PCR_MUX(1);
+	PORTB->PCR[LED_GREEN] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[LED_GREEN] |= PORT_PCR_MUX(1);
+	PORTD->PCR[LED_BLUE] &= ~PORT_PCR_MUX_MASK;
+	PORTD->PCR[LED_BLUE] |= PORT_PCR_MUX(1);
+	
+	//set DDR
+	PTB->PDDR |= (MASK(LED_RED) | MASK(LED_GREEN));
+	PTD->PDDR |= MASK(LED_BLUE);
+	
+	//turn off all LED
+	led_control(RED, 0);
+	led_control(BLUE, 0);
+	led_control(GREEN, 0);
+}
+
 /**** LED ****/
 void initLEDs() {
 	// Enable clock gating: turn on power for PORTC
@@ -128,28 +151,6 @@ void controlRearLED(int state) {
 		GPIOC->PCOR |= (1 << REAR_LED_PIN); // Turn off LED
 		delay(116500);
 	}      
-}
-
-void initGPIO() {
-	//enable clock
-	SIM->SCGC5 |= (SIM_SCGC5_PORTB_MASK | SIM_SCGC5_PORTD_MASK);
-	
-	//set MUX to GPIO
-	PORTB->PCR[LED_RED] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[LED_RED] |= PORT_PCR_MUX(1);
-	PORTB->PCR[LED_GREEN] &= ~PORT_PCR_MUX_MASK;
-	PORTB->PCR[LED_GREEN] |= PORT_PCR_MUX(1);
-	PORTD->PCR[LED_BLUE] &= ~PORT_PCR_MUX_MASK;
-	PORTD->PCR[LED_BLUE] |= PORT_PCR_MUX(1);
-	
-	//set DDR
-	PTB->PDDR |= (MASK(LED_RED) | MASK(LED_GREEN));
-	PTD->PDDR |= MASK(LED_BLUE);
-	
-	//turn off all LED
-	led_control(RED, 0);
-	led_control(BLUE, 0);
-	led_control(GREEN, 0);
 }
 
 /**** PWM ****/
