@@ -33,7 +33,9 @@
 osThreadId_t redLED_Id, greenLED_id, blueLED_id;
 osThreadId_t control_id, LED_running_id, LED_stop_id;
 osThreadId_t motorForward_id, motorLeft_id, motorRight_id, motorBackward_id, motorStop_id, motorCurveLeft_id, motorCurveRight_id;
+osThreadId_t audio1_id, audio2_id;
 
+static volatile int audio_end;
 
 /* Delay routine */
 static void delay (volatile uint32_t nof) {
@@ -461,6 +463,43 @@ void tMotorCurveRight (void *argument) {
 	}
 }
 
+void tAudio1 (void *argument) {
+	for(;;) {
+		int wholenote = (60000 * 4) / TEMPO;
+		uint32_t delayms;
+		for (int i = 0; i < CANON_COUNT; i+=2) {
+			osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+			if (!audio_end) {
+				TPM0->MOD = MUSIC_MOD(canon[i]);
+				TPM0_C2V = MUSIC_MOD(canon[i]) / 4; // Change denominator to adjust duty cycle for best sound
+				delayms = wholenote / canon[i+1];
+				delay(delayms * TICKS_PER_MS / 60); // magic divisor, sounds correct
+				//osDelay(delayms / 2);
+				TPM0_C2V = 0;
+				TPM0->MOD = 0;
+				delay(delayms * TICKS_PER_MS / 60);
+				//osDelay(delayms / 2); 
+			}
+		}
+	}
+}
+
+void tAudio2 (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		if (!audio_end) {
+			for (int i = 0; i < NOTES_BDAY; i++) {
+				TPM0->MOD = MUSIC_MOD(happy_bday[i]);
+				TPM0_C2V = MUSIC_MOD(happy_bday[i]) / 4; // Change denominator to adjust duty cycle for best sound
+				delay(0x78640); // Adjust delay for beat
+				TPM0_C2V = 0;
+				delay(0x30580);
+			}
+		}
+		audio_end = 1;
+	}
+}
+
 int main (void) {
   	// System Initialization
   	SystemCoreClockUpdate();
@@ -480,6 +519,8 @@ int main (void) {
 	motorBackward_id = osThreadNew(tMotorBackward, NULL, NULL);
 	motorRight_id = osThreadNew(tMotorRight, NULL, NULL);
 	motorStop_id = osThreadNew(tMotorStop, NULL, NULL);
+	audio1_id = osThreadNew(tAudio1, NULL, NULL);
+	audio2_id = osThreadNew(tAudio2, NULL, NULL);
 
   	osKernelStart();                      // Start thread execution
 	
