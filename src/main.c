@@ -11,6 +11,11 @@
 #define LED_RED (18)
 #define LED_GREEN (19)
 #define LED_BLUE (1)
+// PWM Pins
+#define PTB0_Pin 0
+#define PTB1_Pin 1
+#define PTB2_Pin 2
+#define PTB3_Pin 3
 // LED Pins
 #define FRONT_LED_START_PIN 0    // Start pin for front LED
 #define FRONT_LED_END_PIN 9      // End pin for front LED
@@ -129,10 +134,108 @@ void initGPIO() {
 	led_control(GREEN, 0);
 }
 
+/**** PWM ****/
+void initPWM(void) {
+	SIM_SCGC5 |= SIM_SCGC5_PORTB_MASK;
+	
+	PORTB->PCR[PTB0_Pin] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[PTB0_Pin] |= PORT_PCR_MUX(3);
+	
+	PORTB->PCR[PTB1_Pin] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[PTB1_Pin] |= PORT_PCR_MUX(3);
+	
+	PORTB->PCR[PTB2_Pin] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[PTB2_Pin] |= PORT_PCR_MUX(3);
+	
+	PORTB->PCR[PTB3_Pin] &= ~PORT_PCR_MUX_MASK;
+	PORTB->PCR[PTB3_Pin] |= PORT_PCR_MUX(3);
+	
+	SIM->SCGC6 |= SIM_SCGC6_TPM1_MASK;
+	SIM->SCGC6 |= SIM_SCGC6_TPM2_MASK;
+	
+	SIM->SOPT2 &= ~SIM_SOPT2_TPMSRC_MASK;
+	SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1);
+	
+	TPM1->MOD = 7500;
+	TPM2->MOD = 7500;
+	
+	TPM1->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM1->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
+	TPM1->SC &= ~(TPM_SC_CPWMS_MASK);
+	TPM2->SC &= ~((TPM_SC_CMOD_MASK) | (TPM_SC_PS_MASK));
+	TPM2->SC |= (TPM_SC_CMOD(1) | TPM_SC_PS(7));
+	TPM2->SC &= ~(TPM_SC_CPWMS_MASK);
+	
+	TPM1_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM1_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM1_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM1_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM2_C0SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM2_C0SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	TPM2_C1SC &= ~((TPM_CnSC_ELSB_MASK) | (TPM_CnSC_ELSA_MASK) | (TPM_CnSC_MSB_MASK) | (TPM_CnSC_MSA_MASK));
+	TPM2_C1SC |= (TPM_CnSC_ELSB(1) | TPM_CnSC_MSB(1));
+	
+	TPM1_C0V = 0;
+  	TPM1_C1V = 0; 
+	TPM2_C0V = 0; 
+  	TPM2_C1V = 0; 
+}
+
+void backward() {
+	TPM1_C0V = 5000;
+    TPM1_C1V = 0; 
+	TPM2_C0V = 5000; 
+    TPM2_C1V = 0; 
+}
+
+void forward() {
+	TPM1_C0V = 0; 
+    TPM1_C1V = 6000; 
+	TPM2_C0V = 0; 
+    TPM2_C1V = 6000; 
+}
+
+void right() {
+	TPM1_C0V = 4500; 
+    TPM1_C1V = 0; 
+	TPM2_C0V = 0; 
+    TPM2_C1V = 4500; 
+}
+
+void left() {
+	TPM1_C0V = 0; 
+    TPM1_C1V = 4500; 
+	TPM2_C0V = 4500; 
+    TPM2_C1V = 0; 
+}
+
+void stop() {
+	TPM1_C0V = 0; 
+    TPM1_C1V = 0; 
+	TPM2_C0V = 0; 
+    TPM2_C1V = 0;
+}
+
+void curveLeft() {
+	TPM1_C0V = 0; 
+  	TPM1_C1V = 7500; 
+	TPM2_C0V = 0; 
+  	TPM2_C1V = 1000; 
+}
+
+void curveRight() {
+	TPM1_C0V = 0; 
+    TPM1_C1V = 1000; 
+	TPM2_C0V = 0; 
+    TPM2_C1V = 7500; 
+}
+
 int main (void) {
   	// System Initialization
   	SystemCoreClockUpdate();
 	initGPIO();
+	initLEDs();
+	initPWM();
   	osKernelInitialize();                 // Initialize CMSIS-RTOS
   	osKernelStart();                      // Start thread execution
 	
