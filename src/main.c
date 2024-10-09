@@ -32,6 +32,8 @@
 
 osThreadId_t redLED_Id, greenLED_id, blueLED_id;
 osThreadId_t control_id, LED_running_id, LED_stop_id;
+osThreadId_t motorForward_id, motorLeft_id, motorRight_id, motorBackward_id, motorStop_id, motorCurveLeft_id, motorCurveRight_id;
+
 
 /* Delay routine */
 static void delay (volatile uint32_t nof) {
@@ -400,6 +402,65 @@ void tLED_stop(void *argument) {
 	}
 }
 
+void tMotorForward (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		forward();
+	}
+}
+
+void tMotorLeft (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		if (leftMethod == 1) {
+			curveLeft();
+		}
+		else {
+			left();
+		}
+	}
+}
+
+void tMotorBackward (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		backward();
+	}
+}
+
+void tMotorRight (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		if (rightMethod == 1) {
+			curveRight();
+		}
+		else {
+			right();
+		}
+	}
+}
+
+void tMotorStop (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		stop();
+	}
+}
+
+void tMotorCurveLeft (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		curveLeft();
+	}
+}
+
+void tMotorCurveRight (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		curveRight();
+	}
+}
+
 int main (void) {
   	// System Initialization
   	SystemCoreClockUpdate();
@@ -414,6 +475,11 @@ int main (void) {
 	
 	LED_running_id = osThreadNew(tLED_running, NULL, NULL);
 	LED_stop_id = osThreadNew(tLED_stop, NULL, NULL);
+	motorForward_id = osThreadNew(tMotorForward, NULL, NULL);
+	motorLeft_id = osThreadNew(tMotorLeft, NULL, NULL);
+	motorBackward_id = osThreadNew(tMotorBackward, NULL, NULL);
+	motorRight_id = osThreadNew(tMotorRight, NULL, NULL);
+	motorStop_id = osThreadNew(tMotorStop, NULL, NULL);
 
   	osKernelStart();                      // Start thread execution
 	
