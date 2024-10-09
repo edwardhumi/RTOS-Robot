@@ -30,6 +30,9 @@
 #define UART2_INT_PRIO 128
 
 
+osThreadId_t redLED_Id, greenLED_id, blueLED_id;
+osThreadId_t control_id, LED_running_id, LED_stop_id;
+
 /* Delay routine */
 static void delay (volatile uint32_t nof) {
 	while(nof != 0) {
@@ -356,6 +359,47 @@ void UART2_IRQHandler(void) {
 	}
 }
 
+void tRed (void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		led_control(RED, 1);
+		osDelay(1000);
+		led_control(RED, 0);
+		osDelay(1000);
+	}
+}
+
+void tBlue (void *argument) {
+	for(;;) {
+		led_control(BLUE, 1);
+		osDelay(1000);
+		led_control(BLUE, 0);
+		osDelay(1000);
+	}
+}
+
+void tLED_running(void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		for (int i = FRONT_LED_START_PIN; i <= FRONT_LED_END_PIN; i++) {
+			PTC->PDOR &= ~(1 << i);
+    }
+		for(int state = 1; state < 11; state++) {
+			osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+			controlFrontLED(state);
+			controlRearLED(1);
+		}
+	}
+}
+
+void tLED_stop(void *argument) {
+	for(;;) {
+		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
+		controlFrontLED(0);
+		controlRearLED(0);
+	}
+}
+
 int main (void) {
   	// System Initialization
   	SystemCoreClockUpdate();
@@ -363,6 +407,14 @@ int main (void) {
 	initLEDs();
 	initPWM();
   	osKernelInitialize();                 // Initialize CMSIS-RTOS
+
+	/** testing */
+	redLED_Id = osThreadNew(tRed, NULL, NULL); // red wait for flag
+	blueLED_id = osThreadNew(tBlue, NULL, NULL); // blue doesn't wait for flag, so it should continously run
+	
+	LED_running_id = osThreadNew(tLED_running, NULL, NULL);
+	LED_stop_id = osThreadNew(tLED_stop, NULL, NULL);
+
   	osKernelStart();                      // Start thread execution
 	
   	for (;;) {}
