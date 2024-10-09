@@ -34,8 +34,11 @@ osThreadId_t redLED_Id, greenLED_id, blueLED_id;
 osThreadId_t control_id, LED_running_id, LED_stop_id;
 osThreadId_t motorForward_id, motorLeft_id, motorRight_id, motorBackward_id, motorStop_id, motorCurveLeft_id, motorCurveRight_id;
 osThreadId_t audio1_id, audio2_id;
+osThreadId_t control_id;
 
 static volatile int audio_end;
+static volatile int rightMethod = 0;
+static volatile int leftMethod = 0;
 
 /* Delay routine */
 static void delay (volatile uint32_t nof) {
@@ -363,6 +366,89 @@ void UART2_IRQHandler(void) {
 	}
 }
 
+/*----------------------------------------------------------------------------
+ * Application main thread
+ *---------------------------------------------------------------------------*/
+void tBrain (void *argument) {
+  for (;;) {
+		if (uart_data == 0x10) {
+			// end
+			osThreadFlagsSet(audio2_id, 0x1);
+			osThreadFlagsSet(LED_stop_id, 0x1);
+			if (!audio_end) {
+				for (int i = 0; i < NOTES_BDAY; i++) {
+					TPM0->MOD = MUSIC_MOD(happy_bday[i]);
+					TPM0_C2V = MUSIC_MOD(happy_bday[i]) / 8; // Change denominator to adjust duty cycle for best sound
+					delay(0x78640); // Adjust delay for beat
+					TPM0_C2V = 0;
+					delay(0x30580);
+				}
+			}
+			audio_end = 1;
+		}
+		else {
+			osThreadFlagsSet(audio1_id, 0x1);
+		
+			if (uart_data == 0x00) {
+				osThreadFlagsSet(LED_stop_id, 0x1);
+				osThreadFlagsSet(motorStop_id, 0x1);
+			}
+			else if (uart_data == 0x01) {
+				osThreadFlagsSet(LED_running_id, 0x1);
+				osThreadFlagsSet(motorForward_id, 0x1);
+			}
+			else if (uart_data == 0x02) {
+				leftMethod = 0;
+				osThreadFlagsSet(LED_running_id, 0x1);
+				osThreadFlagsSet(motorLeft_id, 0x1);
+			}
+			else if (uart_data == 0x08) {
+				osThreadFlagsSet(LED_running_id, 0x1);
+				osThreadFlagsSet(motorBackward_id, 0x1);
+			}
+			else if (uart_data == 0x04) {
+				rightMethod = 0;
+				osThreadFlagsSet(LED_running_id, 0x1);
+				osThreadFlagsSet(motorRight_id, 0x1);
+			}
+			else if (uart_data == 0x20) {
+				leftMethod = 1;
+				osThreadFlagsSet(LED_running_id, 0x1);
+				osThreadFlagsSet(motorLeft_id, 0x1);
+			}
+			else if (uart_data == 0x21) {
+				rightMethod = 1;
+				osThreadFlagsSet(LED_running_id, 0x1);
+				osThreadFlagsSet(motorRight_id, 0x1);
+			}
+			else if (uart_data == 0x31) {
+				//led_control(RED, 1);
+				osThreadFlagsSet(redLED_Id, 0x1);
+			}
+			else if (uart_data == 0x30) {
+				led_control(RED, 0);
+			}
+			else if (uart_data == 0x33) {
+				led_control(GREEN, 1);
+			}
+			else if (uart_data == 0x32) {
+				led_control(GREEN, 0);
+			}
+			else if (uart_data == 0x35) {
+				led_control(BLUE, 1);
+			}
+			else if (uart_data == 0x34) {
+				led_control(BLUE, 0);
+			}
+			else {
+				//PTB->PDOR |= MASK(LED_RED);
+				//PTB->PDOR |= MASK(LED_GREEN);
+				//PTD->PDOR = MASK(LED_BLUE);
+			}
+		}
+	}
+}
+
 void tRed (void *argument) {
 	for(;;) {
 		osThreadFlagsWait(0x1, osFlagsWaitAny, osWaitForever);
@@ -503,10 +589,13 @@ void tAudio2 (void *argument) {
 int main (void) {
   	// System Initialization
   	SystemCoreClockUpdate();
+	initUART2Interrupt(BAUD_RATE);
 	initGPIO();
 	initLEDs();
 	initPWM();
   	osKernelInitialize();                 // Initialize CMSIS-RTOS
+
+	control_id = osThreadNew(tBrain, NULL, NULL);    // Create application main thread
 
 	/** testing */
 	redLED_Id = osThreadNew(tRed, NULL, NULL); // red wait for flag
@@ -520,8 +609,9 @@ int main (void) {
 	motorRight_id = osThreadNew(tMotorRight, NULL, NULL);
 	motorStop_id = osThreadNew(tMotorStop, NULL, NULL);
 	audio1_id = osThreadNew(tAudio1, NULL, NULL);
-	audio2_id = osThreadNew(tAudio2, NULL, NULL);
-
+//	audio2_id = osThreadNew(tAudio2, NULL, NULL);
+//	motorCurveLeft_id = osThreadNew(tMotorCurveLeft, NULL, NULL);
+//	motorCurveRight_id = osThreadNew(tMotorCurveRight, NULL, NULL);
   	osKernelStart();                      // Start thread execution
 	
   	for (;;) {}
